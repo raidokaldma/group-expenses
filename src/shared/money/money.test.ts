@@ -1,0 +1,84 @@
+import { describe, expect, it } from 'vitest';
+import type { Expense, LedgerEntry, Member } from '../types';
+import { ledgerOfMembers } from '../ledgerOfMembers';
+import { computeBalances } from './computeBalances';
+import { parseAmount } from './parseAmount';
+import { settleUp } from './settleUp';
+import { splitShares } from './splitShares';
+
+function member(id: string): Member {
+  return { id, name: id, colorIndex: 0 };
+}
+
+function expense(id: string, amountCents: number, payerId: string, participantIds: string[]): Expense {
+  return { kind: 'expense', id, amountCents, description: '', date: '2026-01-01', createdAtMillis: 0, payerId, participantIds };
+}
+
+describe('parseAmount', () => {
+  it('accepts comma and dot decimals', () => {
+    expect(parseAmount('12,50')).toEqual({ kind: 'valid', cents: 1250 });
+    expect(parseAmount('12.5 €')).toEqual({ kind: 'valid', cents: 1250 });
+  });
+
+  it('accepts sums', () => {
+    expect(parseAmount('10+2,5-1')).toEqual({ kind: 'valid', cents: 1150 });
+  });
+
+  it('rejects empty, zero, negative and malformed input', () => {
+    for (const text of ['', '0', '5-10', '1..2', '10+', 'abc']) {
+      expect(parseAmount(text)).toEqual({ kind: 'invalid' });
+    }
+  });
+});
+
+describe('splitShares', () => {
+  it('always adds up to the full amount', () => {
+    const shares = splitShares(expense('e1', 1000, 'a', ['a', 'b', 'c']));
+    expect(Object.values(shares).sort()).toEqual([333, 333, 334]);
+  });
+});
+
+describe('computeBalances', () => {
+  it('nets expenses and payments to zero', () => {
+    const ledger: LedgerEntry[] = [
+      expense('e1', 3000, 'a', ['a', 'b', 'c']),
+      { kind: 'payment', id: 'p1', amountCents: 1000, date: '2026-01-01', createdAtMillis: 0, fromId: 'b', toId: 'a' },
+    ];
+    const balances = computeBalances([member('a'), member('b'), member('c')], ledger);
+    expect(balances.netByMember).toEqual({ a: 1000, b: 0, c: -1000 });
+  });
+
+  it('leaves out members who no longer exist, the way removing a member does', () => {
+    const ledger: LedgerEntry[] = [
+      expense('paidByGone', 900, 'gone', ['a', 'b']),
+      expense('sharedWithGone', 3000, 'a', ['a', 'b', 'gone']),
+      { kind: 'payment', id: 'p1', amountCents: 500, date: '2026-01-01', createdAtMillis: 0, fromId: 'gone', toId: 'a' },
+    ];
+    const members = [member('a'), member('b')];
+    const balances = computeBalances(members, ledgerOfMembers(ledger, members));
+    expect(balances.netByMember).toEqual({ a: 1500, b: -1500 });
+  });
+});
+
+describe('settleUp', () => {
+  it('returns nothing when everyone is settled', () => {
+    expect(settleUp({ a: 0, b: 0 })).toEqual([]);
+  });
+
+  it('finds independent pairs instead of chaining everyone', () => {
+    const transfers = settleUp({ a: 500, b: -500, c: 300, d: -300 });
+    expect(transfers).toEqual([
+      { fromId: 'b', toId: 'a', amountCents: 500 },
+      { fromId: 'd', toId: 'c', amountCents: 300 },
+    ]);
+  });
+
+  it('settles every balance', () => {
+    const net: Record<string, number> = { a: 700, b: -200, c: -400, d: -100 };
+    for (const transfer of settleUp(net)) {
+      net[transfer.fromId] += transfer.amountCents;
+      net[transfer.toId] -= transfer.amountCents;
+    }
+    expect(Object.values(net).every((cents) => cents === 0)).toBe(true);
+  });
+});

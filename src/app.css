@@ -1,0 +1,339 @@
+/* Design tokens, base elements and the primitives every feature shares. Everything else lives in its component. */
+
+:root {
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --ink: #131a2b;
+  --muted: #5d6780;
+  --line: #d9deea;
+  --accent: #2447d6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4eaff;
+  --owe: #c2410c;
+  --owe-soft: #fdebe1;
+  --get: #0f7a4d;
+  --hero: #18265e;
+  --hero-ink: #ffffff;
+  --hero-muted: #b5c0ea;
+  --hero-owe: #ffb08a;
+  --hero-get: #7be3b4;
+  --display: 'Bricolage Grotesque', 'IBM Plex Sans', system-ui, sans-serif;
+  --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+
+/* The dark tokens are listed twice: once for the system setting, once for the explicit toggle. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0d111b;
+    --surface: #171d2b;
+    --ink: #e9edf7;
+    --muted: #98a2ba;
+    --line: #2a3246;
+    --accent: #8aa2ff;
+    --accent-ink: #0b1020;
+    --accent-soft: #1e2950;
+    --owe: #ff9a6b;
+    --owe-soft: #3a2118;
+    --get: #4fd69b;
+    --hero: #1c2a66;
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #0d111b;
+  --surface: #171d2b;
+  --ink: #e9edf7;
+  --muted: #98a2ba;
+  --line: #2a3246;
+  --accent: #8aa2ff;
+  --accent-ink: #0b1020;
+  --accent-soft: #1e2950;
+  --owe: #ff9a6b;
+  --owe-soft: #3a2118;
+  --get: #4fd69b;
+  --hero: #1c2a66;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.4 var(--body);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+#app {
+  min-height: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+.owes {
+  color: var(--owe);
+}
+.gets-back {
+  color: var(--get);
+}
+.muted {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Screen layout */
+.screen-header {
+  padding: 12px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.screen-main {
+  flex: 1;
+  padding: 4px 16px 104px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.screen-main > * {
+  flex: none;
+}
+.primary-action {
+  width: 100%;
+  height: 54px;
+  border-radius: 27px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 700 17px var(--display);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 12px 28px rgba(20, 40, 130, 0.38), 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+.empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.empty b {
+  display: block;
+  color: var(--ink);
+  font: 700 18px var(--display);
+  margin-bottom: 4px;
+}
+
+/* Lists of rows */
+.day-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 6px 2px -4px;
+}
+.list {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  text-align: left;
+}
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+/* Lists clip their overflow, so a ring outside the row would be cut off. */
+.row:focus-visible {
+  outline-offset: -3px;
+}
+/* The ring follows the list's rounded corners instead of being clipped by them. */
+.list > .row:first-child {
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
+}
+.list > .row:last-child {
+  border-bottom-left-radius: 15px;
+  border-bottom-right-radius: 15px;
+}
+button.row:active {
+  background: var(--accent-soft);
+}
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-detail {
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.row-amount {
+  text-align: right;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.row-amount b {
+  display: block;
+  font-weight: 600;
+}
+.row-amount small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Forms */
+form,
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.input {
+  width: 100%;
+  height: 46px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  padding: 0 12px;
+  font-size: 16px;
+}
+/* The ring is drawn inside the input, over its own border, so the two read as one line and nothing next to it can cover it. */
+.input:focus-visible {
+  outline-offset: -3px;
+}
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.button {
+  flex: 1;
+  height: 50px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  font-weight: 600;
+  background: var(--surface);
+}
+.button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.button.danger {
+  color: var(--owe);
+  flex: none;
+  padding: 0 16px;
+}
+.button.compact {
+  height: 42px;
+}
+.button.fit {
+  flex: none;
+  padding: 0 16px;
+}
+.toggle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+}
+.toggle[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 19px;
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  font-weight: 500;
+  max-width: 100%;
+}
+.chip[aria-pressed='true'],
+.chip.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}

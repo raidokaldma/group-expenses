@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Every change inside a group must bump the group's updatedAt in the same batch,
+    // which keeps the per-group stats (createdAt, updatedAt) trustworthy.
+    function groupTouchedInThisWrite(groupId) {
+      return getAfter(/databases/$(database)/documents/groups/$(groupId)).data.updatedAt == request.time;
+    }
+
+    match /groups/{groupId} {
+      function isValidGroup() {
+        let group = request.resource.data;
+        return group.keys().hasOnly(['name', 'members', 'createdAt', 'updatedAt'])
+          && group.name is string && group.name.size() <= 60
+          && group.members is map && group.members.size() <= 200
+          && group.updatedAt == request.time;
+      }
+
+      // Knowing the ID is the only access control: fetch by ID is public, listing is not.
+      allow get: if true;
+      allow list: if false;
+      allow create: if isValidGroup() && request.resource.data.createdAt == request.time;
+      allow update: if isValidGroup() && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if true;
+
+      match /ledger/{entryId} {
+        function isValidEntry() {
+          let entry = request.resource.data;
+          return entry.amountCents is int && entry.amountCents > 0 && entry.amountCents <= 100000000000
+            && entry.date is string && entry.date.size() <= 10
+            && entry.createdAtMillis is number
+            && (isValidExpense(entry) || isValidPayment(entry));
+        }
+
+        function isValidExpense(entry) {
+          return entry.keys().hasOnly(['kind', 'amountCents', 'date', 'createdAtMillis', 'description', 'payerId', 'participantIds'])
+            && entry.kind == 'expense'
+            && entry.description is string && entry.description.size() <= 80
+            && entry.payerId is string
+            && entry.participantIds is list && entry.participantIds.size() > 0 && entry.participantIds.size() <= 200;
+        }
+
+        function isValidPayment(entry) {
+          return entry.keys().hasOnly(['kind', 'amountCents', 'date', 'createdAtMillis', 'fromId', 'toId'])
+            && entry.kind == 'payment'
+            && entry.fromId is string && entry.toId is string;
+        }
+
+        allow read: if true;
+        allow create, update: if groupTouchedInThisWrite(groupId) && isValidEntry();
+        allow delete: if groupTouchedInThisWrite(groupId);
+      }
+
+      match /activity/{activityId} {
+        // Server time keeps the order honest: a device with a wrong clock can't pin its entries to the top.
+        function isValidActivity() {
+          let activity = request.resource.data;
+          return activity.keys().hasOnly(['createdAt', 'actor', 'change'])
+            && activity.createdAt == request.time
+            && activity.actor is map
+            && activity.change is map && activity.change.kind is string
+            && activity.change.get('members', []) is list && activity.change.get('members', []).size() <= 200;
+        }
+
+        allow read: if true;
+        allow create: if groupTouchedInThisWrite(groupId) && isValidActivity();
+        allow delete: if groupTouchedInThisWrite(groupId);
+      }
+    }
+  }
+}

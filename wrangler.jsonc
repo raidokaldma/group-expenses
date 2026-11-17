@@ -1,0 +1,10 @@
+{
+  // Static site served by Cloudflare Workers. "name" must match the Worker's name in the dashboard.
+  "name": "group-expenses",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    // Every path without a file, like /g/<id>/<slug>, serves index.html and the app routes it.
+    "not_found_handling": "single-page-application"
+  }
+}
