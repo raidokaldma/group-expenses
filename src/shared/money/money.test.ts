@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Expense, LedgerEntry, Member } from '../types';
+import type { Expense, LedgerEntry, Member, Payment } from '../types';
 import { ledgerOfMembers } from '../ledgerOfMembers';
 import { computeBalances } from './computeBalances';
 import { parseAmount } from './parseAmount';
-import { settleUp } from './settleUp';
+import { settleUp, settleUpAfterPayments } from './settleUp';
 import { splitShares } from './splitShares';
 
 function member(id: string): Member {
@@ -80,5 +80,28 @@ describe('settleUp', () => {
       net[transfer.toId] -= transfer.amountCents;
     }
     expect(Object.values(net).every((cents) => cents === 0)).toBe(true);
+  });
+});
+
+describe('settleUpAfterPayments', () => {
+  function payment(fromId: string, toId: string, amountCents: number): Payment {
+    return { kind: 'payment', id: `${fromId}-${toId}`, amountCents, date: '2026-01-01', createdAtMillis: 0, fromId, toId };
+  }
+
+  it('keeps the other transfers when a suggested one is paid', () => {
+    // From these balances, planning afresh after e pays b would reshuffle the rest.
+    const net = { a: -2000, b: 4000, c: 3000, d: 1000, e: -6000 };
+    const plan = settleUp(net);
+    const paid = plan.find((transfer) => transfer.fromId === 'e' && transfer.toId === 'b')!;
+    const netAfterPayment = { ...net, e: net.e + paid.amountCents, b: net.b - paid.amountCents };
+
+    expect(settleUpAfterPayments(netAfterPayment, [payment('e', 'b', paid.amountCents)])).toEqual(
+      plan.filter((transfer) => transfer !== paid),
+    );
+  });
+
+  it('plans afresh when a payment does not fit the plan', () => {
+    const net = { a: 0, b: 1000, c: -1000 };
+    expect(settleUpAfterPayments(net, [payment('a', 'c', 1000)])).toEqual([{ fromId: 'c', toId: 'b', amountCents: 1000 }]);
   });
 });

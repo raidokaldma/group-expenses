@@ -4,7 +4,7 @@
   import { findMember } from '../../shared/members';
   import { ledgerOfMembers } from '../../shared/ledgerOfMembers';
   import { computeBalances } from '../../shared/money/computeBalances';
-  import { settleUp } from '../../shared/money/settleUp';
+  import { settleUpAfterPayments } from '../../shared/money/settleUp';
   import type { ActivityDraft, ActivityEntry, Expense, Group, LedgerEntry, Member, Payment, Viewer } from '../../shared/types';
   import { showGroupNameInAddress } from '../../routing/route.svelte';
   import { saveInBackground } from '../../ui/saveInBackground';
@@ -55,7 +55,8 @@
     return member ? { kind: 'member', member } : { kind: 'onlooker' };
   });
   const balances = $derived(computeBalances(group.members, ledger));
-  const transfers = $derived(settleUp(balances.netByMember));
+  const payments = $derived(ledger.filter((entry) => entry.kind === 'payment'));
+  const transfers = $derived(settleUpAfterPayments(balances.netByMember, payments));
 
   let selectedTab = $state<Tab>('expenses');
   let openSheet = $state<OpenSheet>(firstSheet());

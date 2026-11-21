@@ -1,3 +1,4 @@
+import type { Payment } from '../types';
 import type { CentsByMember } from './splitShares';
 
 export type Transfer = { fromId: string; toId: string; amountCents: number };
@@ -21,6 +22,29 @@ export function settleUp(netByMember: CentsByMember): Transfer[] {
     unsettled.length <= MAXIMUM_MEMBERS_FOR_EXACT_SEARCH ? splitIntoZeroSumSubgroups(unsettled) : [unsettled];
 
   return subgroups.flatMap(transfersWithinSubgroup).sort((a, b) => b.amountCents - a.amountCents);
+}
+
+/**
+ * Like settleUp, but paying a suggested transfer only removes that transfer.
+ * Several plans can be equally short, so planning from the current balances could
+ * reshuffle who pays whom after every payment. Instead, plan from the balances before
+ * any payments and subtract each payment from its transfer. Falls back to planning from
+ * the current balances when a payment does not fit the plan.
+ */
+export function settleUpAfterPayments(netByMember: CentsByMember, payments: Payment[]): Transfer[] {
+  const netBeforePayments = { ...netByMember };
+  for (const payment of payments) {
+    netBeforePayments[payment.fromId] -= payment.amountCents;
+    netBeforePayments[payment.toId] += payment.amountCents;
+  }
+
+  const transfers = settleUp(netBeforePayments);
+  for (const payment of payments) {
+    const transfer = transfers.find((candidate) => candidate.fromId === payment.fromId && candidate.toId === payment.toId);
+    if (!transfer || transfer.amountCents < payment.amountCents) return settleUp(netByMember);
+    transfer.amountCents -= payment.amountCents;
+  }
+  return transfers.filter((transfer) => transfer.amountCents > 0);
 }
 
 /** Dynamic programming over subsets, where each subset is a bitmask of member positions. */
