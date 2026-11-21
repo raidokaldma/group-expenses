@@ -1,6 +1,6 @@
 import type { DocumentData } from 'firebase/firestore';
 import type { Group, LedgerEntry, Member } from '../shared/types';
-import { isRecord, memberNameText, text, timestampMillis, uniqueTexts, wholeNumber } from './readFields';
+import { isRecord, memberNameText, positiveNumber, text, timestampMillis, uniqueTexts, wholeNumber } from './readFields';
 
 export function memberToDocument(member: Pick<Member, 'name' | 'colorIndex'>): DocumentData {
   return { name: member.name, colorIndex: member.colorIndex };
@@ -34,11 +34,17 @@ export function ledgerEntryFromDocument(id: string, data: DocumentData): LedgerE
   if (data.kind === 'payment') {
     return { ...common, kind: 'payment', fromId: text(data.fromId), toId: text(data.toId) };
   }
+  const participantIds = uniqueTexts(data.participantIds);
+  // Expenses saved before weights existed have none and split evenly.
+  const storedWeights = isRecord(data.weightByParticipantId) ? data.weightByParticipantId : {};
   return {
     ...common,
     kind: 'expense',
     description: text(data.description),
     payerId: text(data.payerId),
-    participantIds: uniqueTexts(data.participantIds),
+    participantIds,
+    weightByParticipantId: Object.fromEntries(
+      participantIds.map((participantId) => [participantId, positiveNumber(storedWeights[participantId], 1)]),
+    ),
   };
 }

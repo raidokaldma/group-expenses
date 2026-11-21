@@ -22,6 +22,8 @@ export type Expense = {
   createdAtMillis: number;
   payerId: string;
   participantIds: string[];
+  /** How many parts of the amount each participant takes. Equal weights split evenly. */
+  weightByParticipantId: Record<string, number>;
 };
 
 /** A settle-up transfer between two members. */

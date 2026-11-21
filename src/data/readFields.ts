@@ -25,6 +25,10 @@ export function wholeNumber(value: unknown): number {
   return Math.max(0, Math.round(Number(value)) || 0);
 }
 
+export function positiveNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 /** Server timestamps not yet confirmed are read with the "estimate" option, so they are set too. */
 export function timestampMillis(value: unknown): number {
   return value instanceof Timestamp ? value.toMillis() : 0;

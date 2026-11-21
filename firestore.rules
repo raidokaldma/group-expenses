@@ -34,11 +34,12 @@ service cloud.firestore {
         }
 
         function isValidExpense(entry) {
-          return entry.keys().hasOnly(['kind', 'amountCents', 'date', 'createdAtMillis', 'description', 'payerId', 'participantIds'])
+          return entry.keys().hasOnly(['kind', 'amountCents', 'date', 'createdAtMillis', 'description', 'payerId', 'participantIds', 'weightByParticipantId'])
             && entry.kind == 'expense'
             && entry.description is string && entry.description.size() <= 80
             && entry.payerId is string
-            && entry.participantIds is list && entry.participantIds.size() > 0 && entry.participantIds.size() <= 200;
+            && entry.participantIds is list && entry.participantIds.size() > 0 && entry.participantIds.size() <= 200
+            && (!('weightByParticipantId' in entry) || (entry.weightByParticipantId is map && entry.weightByParticipantId.size() <= 200));
         }
 
         function isValidPayment(entry) {

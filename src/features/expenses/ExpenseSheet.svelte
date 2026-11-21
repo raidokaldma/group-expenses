@@ -5,13 +5,14 @@
   import { expenseChange } from '../../shared/activityChanges';
   import { formatEuros } from '../../shared/money/formatEuros';
   import { parseAmount } from '../../shared/money/parseAmount';
+  import { splitShares } from '../../shared/money/splitShares';
   import { randomId } from '../../shared/randomId';
   import type { Expense, Group, LedgerEntry, Member } from '../../shared/types';
   import MemberChip from '../../ui/MemberChip.svelte';
   import { saveInBackground } from '../../ui/saveInBackground';
   import Sheet from '../../ui/Sheet.svelte';
   import { showToast } from '../../ui/toastMessage.svelte';
-  import { initialExpenseDraft, type ExpenseEditing } from './expenseDraft';
+  import { draftWeights, initialExpenseDraft, weightTextOf, type ExpenseEditing } from './expenseDraft';
 
   type Props = { group: Group; ledger: LedgerEntry[]; actor: Member; editing: ExpenseEditing; onClose: () => void };
   let { group, ledger, actor, editing, onClose }: Props = $props();
@@ -30,6 +31,14 @@
 
   const parsedAmount = $derived(parseAmount(draft.amountText));
   const everyoneSelected = $derived(members.every((member) => draft.participantIds.includes(member.id)));
+  const weights = $derived(draftWeights(draft, draft.participantIds));
+  const selectedMembers = $derived(members.filter((member) => draft.participantIds.includes(member.id)));
+  /** What each participant pays with the weights typed so far, shown next to their weight. */
+  const previewShares = $derived(
+    parsedAmount.kind === 'valid' && weights.kind === 'valid'
+      ? splitShares({ id: 'preview', amountCents: parsedAmount.cents, participantIds: draft.participantIds, weightByParticipantId: weights.weightByParticipantId })
+      : {},
+  );
   const amountHint = $derived.by(() => {
     if (amountRejected) return 'Enter an amount above zero, like 12,50 or 10+2.5.';
     if (draft.amountText.trim() === '') return 'Type an amount. 12,50 and 10+2.5 both work.';
@@ -39,6 +48,7 @@
     const total = formatEuros(parsedAmount.cents);
     if (participantCount === 0) return total;
     if (participantCount === 1) return `${total} · all on one person`;
+    if (draft.splitKind === 'byWeight') return `${total} · split by weight, ${participantCount} people`;
     const lowerShare = Math.floor(parsedAmount.cents / participantCount);
     const splitsEvenly = parsedAmount.cents % participantCount === 0;
     const shareText = splitsEvenly ? formatEuros(lowerShare) : `${formatEuros(lowerShare)}–${formatEuros(lowerShare + 1)}`;
@@ -71,6 +81,8 @@
     const participantIds = draft.participantIds.filter((participantId) => memberIds.has(participantId));
     if (participantIds.length === 0) return showToast('Pick who shares it.');
     if (!memberIds.has(draft.payerId)) return showToast('Pick who paid.');
+    const savedWeights = draftWeights(draft, participantIds);
+    if (savedWeights.kind === 'invalid') return showToast('Weights must be numbers above zero, like 1 or 1,5.');
 
     const description = draft.description.trim();
     const expense: Expense = {
@@ -82,6 +94,7 @@
       createdAtMillis: editing.kind === 'existing' ? editing.expense.createdAtMillis : Date.now(),
       payerId: draft.payerId,
       participantIds,
+      weightByParticipantId: savedWeights.weightByParticipantId,
     };
     if (editing.kind === 'existing' && isUnchanged(editing.expense, expense)) return onClose();
 
@@ -103,7 +116,11 @@
   function isUnchanged(before: Expense, after: Expense): boolean {
     const sameParticipants =
       before.participantIds.length === after.participantIds.length &&
-      before.participantIds.every((participantId) => after.participantIds.includes(participantId));
+      before.participantIds.every(
+        (participantId) =>
+          after.participantIds.includes(participantId) &&
+          before.weightByParticipantId[participantId] === after.weightByParticipantId[participantId],
+      );
     return (
       sameParticipants &&
       before.amountCents === after.amountCents &&
@@ -182,13 +199,42 @@
 
     <div class="field-label">
       Split between
-      <button type="button" class="toggle" aria-pressed={everyoneSelected} onclick={toggleEveryone}>Everyone</button>
+      <span class="toggles">
+        <button
+          type="button"
+          class="toggle"
+          aria-pressed={draft.splitKind === 'byWeight'}
+          onclick={() => (draft.splitKind = draft.splitKind === 'byWeight' ? 'equal' : 'byWeight')}>By weight</button
+        >
+        <button type="button" class="toggle" aria-pressed={everyoneSelected} onclick={toggleEveryone}>Everyone</button>
+      </span>
     </div>
     <div class="chips">
       {#each members as member (member.id)}
         <MemberChip {member} selected={draft.participantIds.includes(member.id)} onSelect={() => toggleParticipant(member.id)} />
       {/each}
     </div>
+    {#if draft.splitKind === 'byWeight' && selectedMembers.length > 0}
+      <div class="weights">
+        {#each selectedMembers as member (member.id)}
+          <label class="weight-row">
+            <span class="weight-name">{member.name}</span>
+            <input
+              class="input weight-input"
+              inputmode="decimal"
+              autocomplete="off"
+              aria-label="Weight for {member.name}"
+              value={weightTextOf(draft, member.id)}
+              oninput={(event) => (draft.weightTextByMemberId[member.id] = event.currentTarget.value)}
+            />
+            <span class="weight-share numeric">{member.id in previewShares ? formatEuros(previewShares[member.id]) : ''}</span>
+          </label>
+        {/each}
+      </div>
+      {#if weights.kind === 'invalid'}
+        <p class="hint owes" role="alert">Weights must be numbers above zero, like 1 or 1,5.</p>
+      {/if}
+    {/if}
     {#if draft.participantIds.length === 0}
       <p class="hint owes" role="alert">Pick at least one person to split between.</p>
     {/if}
@@ -254,6 +300,37 @@
   }
   .hint.owes {
     color: var(--owe);
+  }
+  .toggles {
+    display: flex;
+    gap: 6px;
+  }
+  .weights {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .weight-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .weight-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .weight-input {
+    width: 72px;
+    height: 40px;
+    text-align: center;
+  }
+  .weight-share {
+    width: 84px;
+    text-align: right;
+    color: var(--muted);
   }
   .date {
     border: 0;

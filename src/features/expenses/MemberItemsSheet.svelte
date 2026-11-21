@@ -2,7 +2,7 @@
   import { dayLabel } from '../../shared/dates';
   import { memberOrUnknown } from '../../shared/members';
   import { formatEuros } from '../../shared/money/formatEuros';
-  import { splitShares } from '../../shared/money/splitShares';
+  import { isSplitEvenly, splitShares } from '../../shared/money/splitShares';
   import type { Expense, Group, LedgerEntry, Viewer } from '../../shared/types';
   import { currentDay } from '../../ui/currentDay.svelte';
   import Avatar from '../../ui/Avatar.svelte';
@@ -37,7 +37,7 @@
         <span class="row-main">
           <span class="row-title">{expense.description || 'Expense'}</span>
           <span class="row-detail">
-            {dayLabel(expense.date, currentDay())} · {memberOrUnknown(group, expense.payerId).name} paid {formatEuros(expense.amountCents)} · split {expense.participantIds.length}
+            {dayLabel(expense.date, currentDay())} · {memberOrUnknown(group, expense.payerId).name} paid {formatEuros(expense.amountCents)} · split {expense.participantIds.length}{isSplitEvenly(expense) ? '' : ' by weight'}
           </span>
         </span>
         <span class="row-amount"><b>{formatEuros(shareCents)}</b></span>

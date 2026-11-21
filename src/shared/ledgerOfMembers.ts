@@ -15,7 +15,14 @@ export function ledgerOfMembers(ledger: LedgerEntry[], members: Member[]): Ledge
     }
     const participantIds = entry.participantIds.filter((participantId) => memberIds.has(participantId));
     if (!memberIds.has(entry.payerId) || participantIds.length === 0) continue;
-    entries.push(participantIds.length === entry.participantIds.length ? entry : { ...entry, participantIds });
+    if (participantIds.length === entry.participantIds.length) {
+      entries.push(entry);
+      continue;
+    }
+    const weightByParticipantId = Object.fromEntries(
+      participantIds.map((participantId) => [participantId, entry.weightByParticipantId[participantId]]),
+    );
+    entries.push({ ...entry, participantIds, weightByParticipantId });
   }
   return entries;
 }

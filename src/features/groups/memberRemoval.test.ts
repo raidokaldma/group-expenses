@@ -3,7 +3,17 @@ import type { Expense, Member, Payment } from '../../shared/types';
 import { describeRemoval, removalEffects } from './memberRemoval';
 
 function expense(id: string, payerId: string, participantIds: string[]): Expense {
-  return { kind: 'expense', id, amountCents: 900, description: '', date: '2026-11-17', createdAtMillis: 0, payerId, participantIds };
+  return {
+    kind: 'expense',
+    id,
+    amountCents: 900,
+    description: '',
+    date: '2026-11-17',
+    createdAtMillis: 0,
+    payerId,
+    participantIds,
+    weightByParticipantId: Object.fromEntries(participantIds.map((participantId) => [participantId, 1])),
+  };
 }
 
 function payment(id: string, fromId: string, toId: string): Payment {

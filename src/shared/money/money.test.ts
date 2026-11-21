@@ -4,14 +4,21 @@ import { ledgerOfMembers } from '../ledgerOfMembers';
 import { computeBalances } from './computeBalances';
 import { parseAmount } from './parseAmount';
 import { settleUp, settleUpAfterPayments } from './settleUp';
-import { splitShares } from './splitShares';
+import { parseWeight } from './parseWeight';
+import { isSplitEvenly, splitShares } from './splitShares';
 
 function member(id: string): Member {
   return { id, name: id, colorIndex: 0 };
 }
 
-function expense(id: string, amountCents: number, payerId: string, participantIds: string[]): Expense {
-  return { kind: 'expense', id, amountCents, description: '', date: '2026-01-01', createdAtMillis: 0, payerId, participantIds };
+function expense(
+  id: string,
+  amountCents: number,
+  payerId: string,
+  participantIds: string[],
+  weightByParticipantId = Object.fromEntries(participantIds.map((participantId) => [participantId, 1])),
+): Expense {
+  return { kind: 'expense', id, amountCents, description: '', date: '2026-01-01', createdAtMillis: 0, payerId, participantIds, weightByParticipantId };
 }
 
 describe('parseAmount', () => {
@@ -35,6 +42,34 @@ describe('splitShares', () => {
   it('always adds up to the full amount', () => {
     const shares = splitShares(expense('e1', 1000, 'a', ['a', 'b', 'c']));
     expect(Object.values(shares).sort()).toEqual([333, 333, 334]);
+  });
+
+  it('splits in proportion to the weights', () => {
+    expect(splitShares(expense('e1', 9000, 'a', ['a', 'b', 'c'], { a: 2, b: 1, c: 1.5 }))).toEqual({ a: 4000, b: 2000, c: 3000 });
+  });
+
+  it('gives leftover cents to the largest remainders and still adds up', () => {
+    const shares = splitShares(expense('e1', 1000, 'a', ['a', 'b', 'c'], { a: 0.5, b: 1, c: 1.5 }));
+    expect(shares).toEqual({ a: 167, b: 333, c: 500 });
+  });
+
+  it('tells even splits from weighted ones', () => {
+    expect(isSplitEvenly(expense('e1', 1000, 'a', ['a', 'b'], { a: 2, b: 2 }))).toBe(true);
+    expect(isSplitEvenly(expense('e1', 1000, 'a', ['a', 'b'], { a: 2, b: 1 }))).toBe(false);
+  });
+});
+
+describe('parseWeight', () => {
+  it('accepts whole numbers and comma or dot decimals', () => {
+    expect(parseWeight('2')).toEqual({ kind: 'valid', weight: 2 });
+    expect(parseWeight('1,5')).toEqual({ kind: 'valid', weight: 1.5 });
+    expect(parseWeight('.5')).toEqual({ kind: 'valid', weight: 0.5 });
+  });
+
+  it('rejects empty, zero, negative and malformed input', () => {
+    for (const text of ['', '0', '-1', '1,2,3', 'abc', '1e3']) {
+      expect(parseWeight(text)).toEqual({ kind: 'invalid' });
+    }
   });
 });
 
